@@ -15,6 +15,7 @@ seconds=16                          # seconds to animate
 wiregap=12                          # minimum distance between packets on wire
 ratebase=12                         # how many frames to average rates over
 mencopts="-ovc x264"                # mencoder options
+ptrail=1                            # show packet trails on wire
 sequence="g=1:4:17 g=19:2:47 g=48:1:54 b=55 g=64:12"
 
 # INFORMATION ABOUT sequence VARIABLE:
@@ -84,6 +85,7 @@ echo "Generating sequence and frame data..."
     ratebase='$ratebase'
     wiregap='$wiregap'
     replcol="'"$replcol"'"
+    ptrail='$ptrail'
 
     col[0] = "#ffffff"
     col["g"] = "#009000"
@@ -94,6 +96,11 @@ echo "Generating sequence and frame data..."
         wiren = wiregap
     } else {
         wiren = wirelen
+    }
+
+    # add extra wirelen to allow for trail display
+    if (ptrail) {
+        wiren += wirelen
     }
 
     # start with empty buffers
@@ -164,7 +171,7 @@ function buffer_packet(p) {
     buffer[0] = p
     icount[0] = 1
 }
-function write_filter(file      ,i,btotal,itotal,ototal) {
+function write_filter(file      ,i,j,btotal,itotal,ototal,alpha) {
     btotal = 0
     for (i=0; i<buffern; i++) {
         if (buffer[i]) btotal++
@@ -183,7 +190,24 @@ function write_filter(file      ,i,btotal,itotal,ototal) {
         print col[buffer[i]] > file
     }
     for (i=0; i<wirelen; i++) {
-        print col[wire[i]] > file
+        if (!ptrail || wire[i]) {
+            print col[wire[i]] > file
+        } else {
+            # look ahead for packets to see if we are part of a trail
+            # we assume we can safely add an opacity property
+            alpha = 0
+            for (j=i+1; j<i+wiregap && j<wiren; j++) {
+                if (wire[j]) {
+                    alpha = 0.8-0.5*(j+1-i)/wiregap
+                    printf "%s;fill-opacity:%10.8f\n", col[wire[j]], alpha > file
+                    break
+                }
+            }
+            if (!alpha) {
+                # not part of trail
+                print col[wire[i]] > file
+            }
+        }
     }
     close(file)
 }
