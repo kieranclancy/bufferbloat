@@ -4,10 +4,10 @@ A tool to animate a simple network buffer + wire.
 It was written in order to demonstrate network issues such as "bufferbloat".
 
 Sample video:
-http://kieranclancy.com/bufferbloat/sample.mp4
+http://kieranclancy.com/bufferbloat/sample.avi
 
 REQUIREMENTS:
-Requires inkscape and ffmpeg to run
+Requires inkscape and mencoder to run
 Will use "Blue Highway Condensed" from the Larabie fonts package if available
 
 USAGE:
@@ -18,7 +18,7 @@ USAGE:
    manually.
 2) Run the 'animate' script from the base directory.
    $ ./animate
-3) Afterwards, the video should be available in 'buffer.mp4'
+3) Afterwards, the video should be available in 'buffer.avi'
 
 COPYRIGHT:
 2nd February 2012

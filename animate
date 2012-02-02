@@ -9,11 +9,12 @@
 # all files licensed under GPLv3
 
 svg=buffer.svg                      # svg template
-out=buffer.mp4                      # output video
+out=buffer.avi                      # output video
 fps=24                              # frames per second
 seconds=16                          # seconds to animate
 wiregap=12                          # minimum distance between packets on wire
 ratebase=12                         # how many frames to average rates over
+mencopts="-ovc x264"                # mencoder options
 sequence="g=1:4:17 g=19:2:47 g=48:1:54 b=55 g=64:12"
 
 # see description below for information about the packet sequence
@@ -191,4 +192,4 @@ done
 echo
 
 echo "Generating video..."
-ffmpeg -sameq -f image2 -i "$framedir/%08d.png" -r "$fps" "$out"
+mencoder mf://"$framedir"/*.png $mencopts -fps "$fps" -o "$out"
