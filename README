@@ -5,6 +5,7 @@ It was written in order to demonstrate network issues such as "bufferbloat".
 
 Sample video:
 http://kieranclancy.com/bufferbloat/sample.avi
+[ sequence used: g=1:4:17 g=19:2:47 g=48:1:54 b=55 g=64:12 ]
 
 REQUIREMENTS:
 Requires inkscape and mencoder to run
