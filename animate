@@ -1,0 +1,194 @@
+#!/bin/bash
+
+# animate a network buffer + wire
+# requires inkscape and ffmpeg
+# SVG template uses "Blue Highway Condensed" from the Larabie fonts package
+ 
+# Kieran Clancy <clancy DOT kieran AT gmail DOT com>
+# 2nd February 2012
+# all files licensed under GPLv3
+
+svg=buffer.svg                      # svg template
+out=buffer.mp4                      # output video
+fps=24                              # frames per second
+seconds=16                          # seconds to animate
+wiregap=12                          # minimum distance between packets on wire
+ratebase=12                         # how many frames to average rates over
+sequence="g=1:4:17 g=19:2:47 g=48:1:54 b=55 g=64:12"
+
+# see description below for information about the packet sequence
+
+# in the SVG template, there are a number of special features
+# {buffer} is replaced with the percentage of how full the buffer is
+# {incoming} is the number of incoming packets per second
+# {sending} is the number of packets put on the wire per second
+# the SVG colour '#deadbe' is replaced with appropriate colours
+#   to simulate the "packets". It is assumed that the buffer elements
+#   come before the wire elements in the svg source.
+
+replcol="#deadbe"  # replace this colour
+buffern=25
+wiren=12
+
+framedatadir=framedata
+framedir=frames
+
+test -f "$svg" || { echo "File not found: $svg"; exit 2; }
+
+echo "Cleaning up any previous files..."
+rm -rf "$framedatadir" "$framedir"
+mkdir "$framedatadir" "$framedir"
+
+# INFORMATION ABOUT sequence VARIABLE:
+#
+# currently the max throughput is 1 packet every 12 frames
+# the buffer can hold 25 packets in addition to one on the wire
+# . = no packet
+# g = green
+# b = blue
+#
+# for example, play around with things like:
+# ./sequence 24 g=1:4 b=21
+# g...g...g...g...g...b...
+
+echo "Generating sequence and frame data..."
+./sequence $((fps*seconds)) $sequence | awk 'BEGIN {
+    FS=""
+    fps='$fps'
+    dir="'"$framedatadir"'"
+    buffern='$buffern'
+    wirelen='$wiren'
+    ratebase='$ratebase'
+    wiregap='$wiregap'
+    replcol="'"$replcol"'"
+
+    col[0] = "#ffffff"
+    col["g"] = "#009000"
+    col["b"] = "#000080"
+
+    # note wiregap may be longer than wirelen
+    if (wiregap > wirelen) {
+        wiren = wiregap
+    } else {
+        wiren = wirelen
+    }
+
+    # start with empty buffers
+    for (i=0; i<buffern; i++) {
+        buffer[i] = 0
+    }
+    for (i=0; i<wiren; i++) {
+        wire[i] = 0
+    }
+    for (i=0; i<ratebase; i++) {
+        icount[i] = 0
+        ocount[i] = 0
+    }
+    frame=1
+}
+NR > 1 {
+    print "Error: More than one line in sequence data." > "/dev/stderr"
+    exit 2
+}
+{
+    for (i=1; i<=NF; i++) {
+        if (i != 1) step_frame()
+        buffer_packet($i)
+        file = sprintf("%s/%08d.filter", dir, i)
+        write_filter(file)
+    }
+}
+function step_frame(    i,firstonwire) {
+    # process in/out counts
+    for (i=ratebase-1; i>0; i--) {
+        icount[i] = icount[i-1]
+        ocount[i] = ocount[i-1]
+    }
+    icount[0] = 0
+    ocount[0] = 0
+    # process wire
+    firstonwire=wiren
+    for (i=wiren-1; i>0; i--) {
+        wire[i] = wire[i-1]
+        if (wire[i]) firstonwire = i
+    }
+    wire[0] = 0
+    # check for packet waiting for wire
+    # but only send it if the gap since the last is large enough
+    if (buffer[buffern-1] && firstonwire >= wiregap) {
+        wire[0] = buffer[buffern-1]
+        buffer[buffern-1] = 0
+        ocount[0] = 1
+    }
+    # process buffer
+    for (i=buffern-2; i>=0; i--) {
+        if (!buffer[i]) continue
+        if (!buffer[i+1]) {
+            # we can move this packet along
+            buffer[i+1] = buffer[i]
+            buffer[i] = 0
+        }
+    }
+    frame++
+}
+function buffer_packet(p) {
+    if (p == ".") return
+    if (buffer[0]) {
+        # buffer full!
+        printf "  warning: dropped %c packet at frame %d\n", p, frame > "/dev/stderr"
+        return
+    }
+    buffer[0] = p
+    icount[0] = 1
+}
+function write_filter(file      ,i,btotal,itotal,ototal) {
+    btotal = 0
+    for (i=0; i<buffern; i++) {
+        if (buffer[i]) btotal++
+    }
+    itotal = 0
+    ototal = 0
+    for (i=0; i<ratebase; i++) {
+        itotal += icount[i]
+        ototal += ocount[i]
+    }
+    printf "{buffer}\n%3d%%\n", (100*btotal/buffern) > file
+    printf "{incoming}\n%4.1f/sec\n", (itotal*fps/ratebase) > file
+    printf "{sending}\n%4.1f/sec\n", (ototal*fps/ratebase) > file
+    printf "%s$$%d\n", replcol, (buffern+wirelen) > file
+    for (i=0; i<buffern; i++) {
+        print col[buffer[i]] > file
+    }
+    for (i=0; i<wirelen; i++) {
+        print col[wire[i]] > file
+    }
+    close(file)
+}
+'
+
+declare -a sha1s sha1f
+sha1n=0
+echo "Generating SVGs and PNG images..."
+for f in "$framedatadir"/*.filter; do
+    base=`basename "$f" .filter`
+    ./filter "$svg" < "$f" > "$framedatadir/$base.svg"
+    echo -en "\r  $base.png"
+
+    # check for identical SVG files and just copy the PNG data
+    sha1=`sha1sum "$framedatadir/$base.svg" | awk '{ print $1 }'`
+    for (( i=0; i<sha1n; i++)); do
+        if [ "$sha1" = "${sha1s[i]}" ]; then
+            cp "${sha1f[i]}" "$framedir/$base.png"
+            continue 2
+        fi
+    done
+    sha1s[sha1n]="$sha1"
+    sha1f[sha1n]="$framedir/$base.png"
+    : $((sha1n++))
+
+    inkscape -f "$framedatadir/$base.svg" -e "$framedir/$base.png" > /dev/null || { echo "inkscape returned error $?"; exit 1; }
+done
+echo
+
+echo "Generating video..."
+ffmpeg -sameq -f image2 -i "$framedir/%08d.png" -r "$fps" "$out"

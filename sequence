@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# Generate sequence, one packet (or not) each frame
+
+if [ -z "$1" -o -z "$2" ]; then
+    cat > /dev/stderr <<USAGE
+Usage: $0 frames colour=frame[:step[:endframe]] [...]
+
+Only one packet can be added in a frame.
+USAGE
+    exit 2
+fi
+
+frames="$1"
+shift
+
+subseqs=0
+declare -a scolour sstart sstep send
+while [ $# -gt 0 ]; do
+    IFS="="
+    read colour frame < <(echo "$1")
+    shift
+    if [ -z "$colour" -o -z "$frame" ]; then
+        echo "Invalid syntax." > /dev/stderr
+        exit 2
+    fi
+    IFS=":"
+    read start step endframe < <(echo "$frame")
+    if [ -z "$start" ]; then
+        echo "Invalid syntax." > /dev/stderr
+        exit 2
+    fi
+    if [ -z "$step" ]; then
+        if [ -n "$endframe" ]; then
+            echo "Invalid syntax." > /dev/stderr
+            exit 2
+        fi
+        step=0
+    fi
+    if [ -z "$endframe" ]; then
+        endframe="$frames"
+    fi
+    scolour[subseqs]=$colour
+    sstart[subseqs]=$start
+    sstep[subseqs]=$step
+    send[subseqs]=$endframe
+    : $((subseqs++))
+done
+
+for (( i=1; i<=frames; i++)); do
+    f=.
+    for (( j=0; j<subseqs; j++)); do
+        if [ $i -lt ${sstart[j]} ]; then
+            : do nothing
+        elif [ $i -eq ${sstart[j]} ]; then
+            f=${scolour[j]}
+        elif [ ${sstep[j]} -gt 0 -a $i -le ${send[j]} ]; then
+            if [ $(( (i-sstart[j]) % sstep[j] )) -eq 0 ]; then
+                f=${scolour[j]}
+            fi
+        fi
+    done
+    echo -n "$f"
+done
+
+echo

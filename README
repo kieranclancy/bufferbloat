@@ -1,0 +1,26 @@
+DESCRIPTION:
+A tool to animate a simple network buffer + wire.
+
+It was written in order to demonstrate network issues such as "bufferbloat".
+
+Sample video:
+http://kieranclancy.com/bufferbloat/sample.mp4
+
+REQUIREMENTS:
+Requires inkscape and ffmpeg to run
+Will use "Blue Highway Condensed" from the Larabie fonts package if available
+
+USAGE:
+1) Set the variables at the top section of the 'animate' script appropriately.
+   The current values are sensible defaults. The most significant variable is
+   the 'sequence' variable, which is documented a little further down in the
+   script. The 'sequence' tool is also useful for testing packet sequences
+   manually.
+2) Run the 'animate' script from the base directory.
+   $ ./animate
+3) Afterwards, the video should be available in 'buffer.mp4'
+
+COPYRIGHT:
+2nd February 2012
+Kieran Clancy <clancy DOT kieran AT gmail DOT com>
+Licensed under GPLv3 - refer to LICENSE file

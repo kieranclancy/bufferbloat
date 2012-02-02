@@ -1,0 +1,56 @@
+#!/usr/bin/awk -f
+
+# this takes an SVG image as an argument and filters it to standard output
+# on standard input it takes alternating regular expressions and replacements.
+# as a special case, if a regular expression ends with $$<integer>, it should
+# be followed by <integer> replacements, which will be made in the order given
+# after which no further replacements will be made.
+
+BEGIN {
+    if (ARGC != 2) {
+        print "No file specified" > "/dev/stderr"
+        exit
+    }
+    nrx = 0
+    nsrx = 0
+    while (getline < "/dev/stdin") {
+        FS="\\$\\$"
+        if (NF > 2) {
+            print "Too many $$ on line." > "/dev/stderr"
+            exit
+        }
+        if (NF == 0) {
+            break
+        }
+        if (NF == 1) {
+            rx[nrx] = $0
+            getline < "/dev/stdin"
+            rp[nrx] = $0
+            nrx++
+        }
+        if (NF == 2) {
+            srx[nsrx] = $1
+            srpn[nsrx] = $2
+            sseen[nsrx] = 0
+            for (i=0; i<srpn[nsrx]; i++) {
+                getline < "/dev/stdin"
+                srp[nsrx,i] = $0
+            }
+            nsrx++
+        }
+    }
+}
+{
+    for (i=0; i<nrx; i++) {
+        gsub(rx[i],rp[i])
+    }
+    for (i=0; i<nsrx; i++) {
+        while (sseen[i] < srpn[i]) {
+            if (!sub(srx[i], srp[i,sseen[i]])) {
+                break
+            }
+            sseen[i]++
+        }
+    }
+    print
+}
